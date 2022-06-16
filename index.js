@@ -24,35 +24,23 @@ async function firebaseFetchData(uuid) {
     });
 }
 
-async function firebaseGetData(uuid) {
-    const drainData = await firebaseFetchData(`/-DRAIN_LIST/${uuid}`);
-    const drainName = await firebaseFetchData(`/-DRAIN_UUID/${uuid}`);
-
-    let returnData = [];
-    for (let key in drainData) {
-        const element = drainData[key];
-        returnData.push({ time: new Date(element.epoch),
-                          cl: parseFloat(element.current_level),
-                          tl: parseFloat(element.flood_threshold) });
-    }
-
-    return returnData;
-}
-
 var times = {}, inputs = {};
 
-async function generateDataPoint(uuid, name, current, threshold) {
+async function generateDataPoint() {
+    let uuid = inputs["uuid"];
+
+    console.log(inputs);
     if (!times[uuid])
         times[uuid] = Date.now();
     else
         times[uuid] += 15 * 60 * 1000;
-    let getRef = await get(ref(database, `/uuids/${uuid}`)).then(snap=>snap.val());
+
+    let getRef = await get(ref(database, `/uuids/${uuid}`));
     if (!getRef.exists()) await push(ref(database, `uuids/${uuid}`), name);
-    let path = "/data/" + uuid;
-    let pushRef = await push(ref(database, path), {
-        current_level: current,
-        epoch: time,
-        flood_threshold: threshold
+    let pushRef = await push(ref(database, `/data/${uuid}`), {
+        current_level: inputs["cl"],
+        epoch: times[uuid],
+        flood_threshold: inputs["tl"]
     });
     let updateRef = await push(ref(database, `/updates/${uuid}`), times[uuid]);
     let pushed = await get(pushRef);
@@ -61,27 +49,23 @@ async function generateDataPoint(uuid, name, current, threshold) {
     console.log(JSON.stringify(updated));
 }
 
-async function callthat(uuid) {
-    await generateDataPoint(uuid, name, current, threshold);
-}
 var button = document.createElement("button");
 button.innerHTML = "send data";
-button.addEventListener("click", callthat);
+button.addEventListener("click", generateDataPoint);
 document.getElementById("root").append(button);
 
+// =====getter=====
+var log = document.getElementById("log");
 async function getall(_) {
     let data = await get(ref(database, '/')).then(snapshot=>snapshot.val());
-    var log = document.getElementById("log");
     log.innerHTML += JSON.stringify(data);
 }
-var getall_button = document.createElement("button");
-getall_button.innerHTML = "get all";
+var getall_button = document.createElement("button"); getall_button.innerHTML = "get all";
 getall_button.addEventListener("click", getall);
 document.getElementById("root").append(getall_button);
 
-async function getuuid() {
-    let data = await get(ref(database, '/')).then(snapshot=>snapshot.val());
-    var log = document.getElementById("log");
+async function getuuid(uuid) {
+    let data = await get(ref(database, `/data/${uuid}`)).then(snapshot=>snapshot.val());
     log.innerHTML += JSON.stringify(data);
 }
 var getuuid_button = document.createElement("button");
@@ -89,16 +73,13 @@ getuuid_button.innerHTML = "get uuid";
 getuuid_button.addEventListener("click", (value)=>getuuid(value));
 document.getElementById("root").append(getuuid_button);
 
+
 var in1 = document.getElementById("uuid");
 var in2 = document.getElementById("name");
-var in3 = document.getElementById("wl");
-var in4 = document.getElementById("al");
+var in3 = document.getElementById("cl");
+var in4 = document.getElementById("tl");
 
-function handle(id, value) {
-    inputs[id] = value;
-}
-
-in1.addEventListener("input", (value) => handle(in1.id, value));
-in2.addEventListener("input", (value) => handle(in2.id, value));
-in3.addEventListener("input", (value) => handle(in3.id, value));
-in4.addEventListener("input", (value) => handle(in4.id, value));
+in1.addEventListener("input", (event) => inputs[in1.id]=event.value);
+in2.addEventListener("input", (event) => inputs[in2.id]=event.value);
+in3.addEventListener("input", (event) => inputs[in3.id]=event.value);
+in4.addEventListener("input", (event) => inputs[in4.id]=event.value);
